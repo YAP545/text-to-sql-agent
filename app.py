@@ -24,10 +24,6 @@ with st.sidebar:
 user_query = st.text_input("Ask your question:")
 
 if st.button("Run"):
-    if not st.secrets.get("GROQ_API_KEY"):
-        st.error("Missing API Key")
-        st.stop()
-
     if user_query:
         with st.spinner("Processing..."):
             initial_state = {
@@ -39,11 +35,24 @@ if st.button("Run"):
                 "explanation": ""
             }
 
-            result = workflow_app.invoke(initial_state)
+            try:
+                result = workflow_app.invoke(initial_state)
+            except Exception as e:
+                st.error(f"App crashed: {e}")
+                st.stop()
 
             if result["sql_error"]:
                 st.error(result["sql_error"])
             else:
+                st.subheader("Explanation")
                 st.write(result["explanation"])
-                st.dataframe(pd.DataFrame(ast.literal_eval(result["query_results"])))
+
+                st.subheader("Data")
+                try:
+                    data = ast.literal_eval(result["query_results"])
+                    st.dataframe(pd.DataFrame(data))
+                except:
+                    st.write(result["query_results"])
+
+                st.subheader("SQL Query")
                 st.code(result["generated_sql"], language="sql")
