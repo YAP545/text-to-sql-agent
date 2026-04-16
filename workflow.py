@@ -16,7 +16,7 @@ class AgentState(TypedDict):
 def generate_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
-            model="llama3-70b-8192",   # ✅ FIXED MODEL
+            model="llama-3.1-8b-instant",   # ✅ FINAL WORKING MODEL
             groq_api_key="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",
             temperature=0
         )
@@ -55,7 +55,7 @@ def execute_sql_node(state: AgentState):
 def explain_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
-            model="llama3-70b-8192",   # ✅ FIXED MODEL
+            model="llama-3.1-8b-instant",   # ✅ SAME FIX HERE
             groq_api_key="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"
         )
 
