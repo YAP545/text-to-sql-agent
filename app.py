@@ -24,9 +24,11 @@ with st.sidebar:
 user_query = st.text_input("What would you like to know?", placeholder="e.g., Which sales employee brought in the most revenue?")
 
 if st.button("Run Analytics Engine"):
-    if not st.secrets.get("OPENAI_API_KEY"):
-        st.error("Please add your OPENAI_API_KEY to the Streamlit Secrets manager!")
+    # --- THIS IS THE SECTION THAT WAS UPDATED ---
+    if not st.secrets.get("GOOGLE_API_KEY"):
+        st.error("Please add your GOOGLE_API_KEY to the Streamlit Secrets manager!")
         st.stop()
+    # --------------------------------------------
 
     if user_query:
         with st.spinner("Agent is analyzing schema and writing SQL..."):
