@@ -16,7 +16,7 @@ class AgentState(TypedDict):
 def generate_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
-            model="mixtral-8x7b-32768",
+            model="llama3-70b-8192",   # ✅ FIXED MODEL
             groq_api_key="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",
             temperature=0
         )
@@ -33,7 +33,7 @@ def generate_sql_node(state: AgentState):
         })
 
         sql = response.content.strip().replace("```", "")
-        return {"generated_sql": sql}
+        return {"generated_sql": sql, "sql_error": ""}
 
     except Exception as e:
         return {"generated_sql": "", "sql_error": str(e)}
@@ -55,7 +55,7 @@ def execute_sql_node(state: AgentState):
 def explain_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
-            model="mixtral-8x7b-32768",
+            model="llama3-70b-8192",   # ✅ FIXED MODEL
             groq_api_key="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"
         )
 
