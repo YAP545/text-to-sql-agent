@@ -2,7 +2,7 @@ import sqlite3
 import streamlit as st
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
 # 1. Define the State
@@ -16,11 +16,11 @@ class AgentState(TypedDict):
 
 # 2. Define the Nodes
 def generate_sql_node(state: AgentState):
-    # Pull the API key safely from Streamlit Secrets
-    llm = ChatOpenAI(model="gpt-4-turbo", temperature=0, api_key=st.secrets["OPENAI_API_KEY"])
+    # Now correctly using Google Gemini and checking for GOOGLE_API_KEY
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, google_api_key=st.secrets["GOOGLE_API_KEY"])
     
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert Database Administrator. Given the following database schema, write a highly optimized SQLite query to answer the user's request. Return ONLY the raw SQL query, without markdown formatting.\n\nSchema:\n{schema}"),
+        ("system", "You are an expert Database Administrator. Given the following database schema, write a highly optimized SQLite query to answer the user's request. Return ONLY the raw SQL query, without markdown formatting or the word 'sql'.\n\nSchema:\n{schema}"),
         ("user", "{query}")
     ])
     chain = prompt | llm
@@ -40,7 +40,8 @@ def execute_sql_node(state: AgentState):
         return {"query_results": "", "sql_error": str(e)}
 
 def explain_sql_node(state: AgentState):
-    llm = ChatOpenAI(model="gpt-4-turbo", temperature=0, api_key=st.secrets["OPENAI_API_KEY"])
+    # Now correctly using Google Gemini and checking for GOOGLE_API_KEY
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, google_api_key=st.secrets["GOOGLE_API_KEY"])
     
     if state["sql_error"]:
         return {"explanation": f"Failed to execute query due to error: {state['sql_error']}"}
