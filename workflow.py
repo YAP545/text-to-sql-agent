@@ -1,5 +1,4 @@
 import sqlite3
-import streamlit as st
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
@@ -15,25 +14,29 @@ class AgentState(TypedDict):
 
 
 def generate_sql_node(state: AgentState):
-    llm = ChatGroq(
-        model="llama3-8b-8192",
-        groq_api_key=st.secrets["GROQ_API_KEY"],
-        temperature=0
-    )
+    try:
+        llm = ChatGroq(
+            model="mixtral-8x7b-32768",
+            groq_api_key="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",
+            temperature=0
+        )
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "Write only SQL query."),
-        ("user", "Schema:\n{schema}\n\nQuestion: {query}")
-    ])
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "Write only SQL query. No explanation."),
+            ("user", "Schema:\n{schema}\n\nQuestion: {query}")
+        ])
 
-    chain = prompt | llm
-    response = chain.invoke({
-        "schema": state["db_schema"],
-        "query": state["user_query"]
-    })
+        chain = prompt | llm
+        response = chain.invoke({
+            "schema": state["db_schema"],
+            "query": state["user_query"]
+        })
 
-    sql = response.content.strip().replace("```", "")
-    return {"generated_sql": sql}
+        sql = response.content.strip().replace("```", "")
+        return {"generated_sql": sql}
+
+    except Exception as e:
+        return {"generated_sql": "", "sql_error": str(e)}
 
 
 def execute_sql_node(state: AgentState):
@@ -50,23 +53,27 @@ def execute_sql_node(state: AgentState):
 
 
 def explain_sql_node(state: AgentState):
-    llm = ChatGroq(
-        model="llama3-8b-8192",
-        groq_api_key=st.secrets["GROQ_API_KEY"]
-    )
+    try:
+        llm = ChatGroq(
+            model="mixtral-8x7b-32768",
+            groq_api_key="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"
+        )
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "Explain simply."),
-        ("user", "SQL: {sql}, Result: {result}")
-    ])
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "Explain the result simply."),
+            ("user", "SQL: {sql}, Result: {result}")
+        ])
 
-    chain = prompt | llm
-    response = chain.invoke({
-        "sql": state["generated_sql"],
-        "result": state["query_results"]
-    })
+        chain = prompt | llm
+        response = chain.invoke({
+            "sql": state["generated_sql"],
+            "result": state["query_results"]
+        })
 
-    return {"explanation": response.content}
+        return {"explanation": response.content}
+
+    except Exception as e:
+        return {"explanation": str(e)}
 
 
 def create_workflow():
