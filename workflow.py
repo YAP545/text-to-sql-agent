@@ -2,7 +2,7 @@ import sqlite3
 import streamlit as st
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
 # 1. Define the State
@@ -16,11 +16,11 @@ class AgentState(TypedDict):
 
 # 2. Define the Nodes
 def generate_sql_node(state: AgentState):
-    # Now correctly using Google Gemini and checking for GOOGLE_API_KEY
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, google_api_key=st.secrets["GOOGLE_API_KEY"])
+    # Using Groq Llama 3
+    llm = ChatGroq(model="llama3-8b-8192", groq_api_key=st.secrets["GROQ_API_KEY"])
     
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert Database Administrator. Given the following database schema, write a highly optimized SQLite query to answer the user's request. Return ONLY the raw SQL query, without markdown formatting or the word 'sql'.\n\nSchema:\n{schema}"),
+        ("system", "You are an expert Database Administrator. Given the schema, write a highly optimized SQLite query. Return ONLY the raw SQL query, no markdown.\n\nSchema:\n{schema}"),
         ("user", "{query}")
     ])
     chain = prompt | llm
@@ -40,15 +40,14 @@ def execute_sql_node(state: AgentState):
         return {"query_results": "", "sql_error": str(e)}
 
 def explain_sql_node(state: AgentState):
-    # Now correctly using Google Gemini and checking for GOOGLE_API_KEY
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, google_api_key=st.secrets["GOOGLE_API_KEY"])
+    llm = ChatGroq(model="llama3-8b-8192", groq_api_key=st.secrets["GROQ_API_KEY"])
     
     if state["sql_error"]:
-        return {"explanation": f"Failed to execute query due to error: {state['sql_error']}"}
+        return {"explanation": f"Failed to execute query: {state['sql_error']}"}
         
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a data educator. The user asked a question, an SQL query was generated, and results were returned. Explain WHY this specific SQL query was written. Break down the SELECT statements and JOINs so a non-technical user can trust the data."),
-        ("user", "Question: {query}\nSQL: {sql}\nResults: {results}\n\nProvide the explanation and a brief summary of the results.")
+        ("system", "You are a data educator. Explain WHY this specific SQL query was written and what the results mean for a non-technical user."),
+        ("user", "Question: {query}\nSQL: {sql}\nResults: {results}")
     ])
     chain = prompt | llm
     response = chain.invoke({
