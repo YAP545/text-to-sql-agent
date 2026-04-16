@@ -1,5 +1,5 @@
-langgraph
-langchain
-langchain-groq
-pandas
 streamlit
+pandas
+langchain
+langgraph
+langchain-groq
