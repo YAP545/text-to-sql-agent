@@ -21,8 +21,11 @@ def generate_sql_node(state: AgentState):
             temperature=0
         )
 
+        # ✅ FIX: Stricter prompt to prevent table name hallucinations
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "Write only SQL query. No explanation."),
+            ("system", """You are an expert SQL Developer. You MUST strictly use the exact table and column names provided in the Schema below. 
+            Pay close attention to plural vs singular names (e.g., 'students' vs 'Student'). 
+            Return ONLY the raw SQLite query. No markdown, no backticks, no 'sql' prefix."""),
             ("user", "Schema:\n{schema}\n\nQuestion: {query}")
         ])
 
@@ -32,7 +35,8 @@ def generate_sql_node(state: AgentState):
             "query": state["user_query"]
         })
 
-        sql = response.content.strip().replace("```", "")
+        # ✅ FIX: Clean up markdown blocks so SQLite doesn't crash
+        sql = response.content.strip().replace("```sql", "").replace("```", "").replace(";", "")
         return {"generated_sql": sql, "sql_error": ""}
 
     except Exception as e:
@@ -40,7 +44,8 @@ def generate_sql_node(state: AgentState):
 
 
 def execute_sql_node(state: AgentState):
-    conn = sqlite3.connect("company.db")
+    # ✅ FIX: Changed to temp_db.db to support the file uploader we built
+    conn = sqlite3.connect("temp_db.db")
     cursor = conn.cursor()
     try:
         cursor.execute(state["generated_sql"])
@@ -60,12 +65,13 @@ def explain_sql_node(state: AgentState):
         )
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "Explain the result simply."),
-            ("user", "SQL: {sql}, Result: {result}")
+            ("system", "Explain the SQL results simply for a non-technical user."),
+            ("user", "Question: {query}\nSQL: {sql}\nResult: {result}")
         ])
 
         chain = prompt | llm
         response = chain.invoke({
+            "query": state["user_query"],
             "sql": state["generated_sql"],
             "result": state["query_results"]
         })
