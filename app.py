@@ -2,15 +2,16 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import ast
-from gtts import gTTS
-from io import BytesIO
-from streamlit_mic_recorder import mic_recorder, speech_to_text
 from workflow import create_workflow
 
-st.set_page_config(page_title="AI Data Agent", page_icon="🎙️")
+st.set_page_config(page_title="AI SQL Agent", page_icon="🤖", layout="wide")
 
 # --- Initialize Workflow ---
-workflow_app = create_workflow()
+@st.cache_resource
+def get_workflow():
+    return create_workflow()
+
+workflow_app = get_workflow()
 
 def get_schema_from_uploaded_file(db_path):
     conn = sqlite3.connect(db_path)
@@ -20,46 +21,41 @@ def get_schema_from_uploaded_file(db_path):
     conn.close()
     return schema
 
-def speak_text(text):
-    tts = gTTS(text=text, lang='en')
-    fp = BytesIO()
-    tts.write_to_fp(fp)
-    return fp
-
 # --- Sidebar: Database Upload ---
 with st.sidebar:
     st.header("📂 Upload Database")
-    uploaded_file = st.file_uploader("Upload an SQLite file", type=["db", "sqlite"])
+    st.write("Upload an SQLite database to analyze.")
+    uploaded_file = st.file_uploader("Upload a .db or .sqlite file", type=["db", "sqlite"])
     
     if uploaded_file:
-        # Save uploaded file locally to connect to it
+        # Save uploaded file locally for the workflow to access
         with open("temp_db.db", "wb") as f:
             f.write(uploaded_file.getbuffer())
-        current_db = "temp_db.db"
-        st.success("Database Loaded!")
+        st.success("Database Loaded Successfully!")
+        schema = get_schema_from_uploaded_file("temp_db.db")
+        
+        st.subheader("Detected Schema")
+        st.code(schema, language="sql")
     else:
-        st.warning("Please upload a .db file to begin.")
+        st.warning("Please upload a database file to begin.")
         st.stop()
 
-    schema = get_schema_from_uploaded_file(current_db)
-    st.subheader("Detected Schema")
-    st.code(schema, language="sql")
-
 # --- Main UI ---
-st.title("Autonomous Voice-to-SQL Agent 🤖")
+st.title("Autonomous Text-to-SQL Agent 🤖📊")
+st.markdown("Ask natural language questions about your uploaded database, and the agent will write, execute, and explain the SQL.")
 
-st.subheader("Step 1: Ask your question")
-# This component captures voice and converts it to text automatically
-text_from_voice = speech_to_text(language='en', use_container_width=True, just_once=True, key='STT')
-manual_input = st.text_input("Or type your question here:", value=text_from_voice if text_from_voice else "")
+user_query = st.text_input("Ask a question about your data:")
 
-final_query = manual_input if manual_input else text_from_voice
+if st.button("Run Analytics Engine"):
+    # Security check
+    if not st.secrets.get("GROQ_API_KEY"):
+        st.error("Please add your GROQ_API_KEY to the Streamlit Secrets manager!")
+        st.stop()
 
-if st.button("Run Analysis"):
-    if final_query:
-        with st.spinner("Analyzing your database..."):
+    if user_query:
+        with st.spinner("Agent is analyzing the schema and processing your query..."):
             initial_state = {
-                "user_query": final_query,
+                "user_query": user_query,
                 "db_schema": schema,
                 "generated_sql": "",
                 "query_results": "",
@@ -67,26 +63,33 @@ if st.button("Run Analysis"):
                 "explanation": ""
             }
 
-            # Invoke the graph
-            result = workflow_app.invoke(initial_state)
+            try:
+                result = workflow_app.invoke(initial_state)
+            except Exception as e:
+                st.error(f"Agent crashed: {e}")
+                st.stop()
 
+            # Display Error if SQL failed
             if result["sql_error"]:
-                st.error(f"SQL Error: {result['sql_error']}")
+                st.error(f"SQL Execution Error: {result['sql_error']}")
+                with st.expander("View Failed SQL"):
+                    st.code(result["generated_sql"], language="sql")
             else:
-                # 1. Voice Explanation
-                st.subheader("Explanation")
-                st.write(result["explanation"])
-                audio_fp = speak_text(result["explanation"])
-                st.audio(audio_fp, format='audio/mp3', autoplay=True)
+                # Layout for successful results
+                st.subheader("Agent Explanation")
+                st.info(result["explanation"])
 
-                # 2. Data Display
-                st.subheader("Results")
+                st.subheader("Data Results")
                 try:
                     data = ast.literal_eval(result["query_results"])
-                    st.dataframe(pd.DataFrame(data), use_container_width=True)
+                    if data:
+                        st.dataframe(pd.DataFrame(data), use_container_width=True)
+                    else:
+                        st.write("Query executed successfully, but returned no data.")
                 except:
                     st.write(result["query_results"])
 
-                # 3. SQL Transparency
                 with st.expander("View Generated SQL"):
                     st.code(result["generated_sql"], language="sql")
+    else:
+        st.warning("Please enter a question first.")
