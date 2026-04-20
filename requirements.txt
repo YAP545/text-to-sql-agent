@@ -3,3 +3,6 @@ pandas
 langchain
 langchain-groq
 langgraph
+streamlit-mic-recorder
+edge-tts
+asyncio
