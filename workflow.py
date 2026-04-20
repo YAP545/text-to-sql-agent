@@ -5,7 +5,6 @@ from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
-# Define the State passing between agents
 class AgentState(TypedDict):
     user_query: str
     db_schema: str
@@ -22,31 +21,23 @@ def generate_sql_node(state: AgentState):
             temperature=0
         )
 
-        # The strict, anti-hallucination prompt
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert SQLite Database Administrator. You MUST adhere strictly to these rules:
-            1. ONLY use the exact tables and columns provided in the Schema below. Pay attention to plural vs singular names.
-            2. NEVER invent, guess, or hallucinate table names or columns.
-            3. If a question requires data from multiple tables, use INNER JOINs based on the foreign keys in the schema.
+            ("system", """You are an expert SQLite Database Administrator. STRICT RULES:
+            1. ONLY use the exact tables and columns provided in the Schema below.
+            2. NEVER invent or guess table names.
+            3. Use INNER JOINs based on foreign keys for multi-table queries.
             4. Return ONLY the raw SQL query. No markdown, no explanation, no backticks."""),
             ("user", "Schema:\n{schema}\n\nQuestion: {query}")
         ])
 
         chain = prompt | llm
-        response = chain.invoke({
-            "schema": state["db_schema"],
-            "query": state["user_query"]
-        })
-
-        # Clean the SQL output to prevent execution errors
+        response = chain.invoke({"schema": state["db_schema"], "query": state["user_query"]})
         sql = response.content.strip().replace("```sql", "").replace("```", "").replace(";", "")
         return {"generated_sql": sql, "sql_error": ""}
-
     except Exception as e:
         return {"generated_sql": "", "sql_error": str(e)}
 
 def execute_sql_node(state: AgentState):
-    # Connects to the uploaded database file
     conn = sqlite3.connect("temp_db.db")
     cursor = conn.cursor()
     try:
@@ -63,12 +54,17 @@ def explain_sql_node(state: AgentState):
         llm = ChatGroq(
             model="llama-3.1-8b-instant",
             groq_api_key=st.secrets["GROQ_API_KEY"],
-            temperature=0.7
+            temperature=0.5
         )
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a friendly data analyst. Explain the SQL results simply for a non-technical user. Do not mention the SQL code itself, just summarize the data."),
-            ("user", "Question: {query}\nSQL used: {sql}\nResult from DB: {result}")
+            ("system", """You are a Voice AI Data Analyst. Translate the SQL results into a spoken response.
+            CRITICAL RULES:
+            1. Be extremely concise (under 2 sentences).
+            2. Speak conversationally.
+            3. NEVER read raw SQL code or brackets out loud.
+            4. Summarize large data sets naturally."""),
+            ("user", "Question: {query}\nSQL: {sql}\nResult: {result}")
         ])
 
         chain = prompt | llm
@@ -77,22 +73,17 @@ def explain_sql_node(state: AgentState):
             "sql": state["generated_sql"],
             "result": state["query_results"]
         })
-
         return {"explanation": response.content}
-
     except Exception as e:
-        return {"explanation": str(e)}
+        return {"explanation": "I encountered an error."}
 
 def create_workflow():
     workflow = StateGraph(AgentState)
-
     workflow.add_node("generate", generate_sql_node)
     workflow.add_node("execute", execute_sql_node)
     workflow.add_node("explain", explain_sql_node)
-
     workflow.set_entry_point("generate")
     workflow.add_edge("generate", "execute")
     workflow.add_edge("execute", "explain")
     workflow.add_edge("explain", END)
-
     return workflow.compile()
