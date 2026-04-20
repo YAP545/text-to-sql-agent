@@ -1,7 +1,5 @@
 streamlit
 pandas
 langchain
-langgraph
 langchain-groq
-streamlit-mic-recorder
-gTTS
+langgraph
