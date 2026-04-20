@@ -17,7 +17,7 @@ def generate_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
             model="llama-3.1-8b-instant",   # ✅ FINAL WORKING MODEL
-            groq_api_key="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",
+            groq_api_key="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",
             temperature=0
         )
 
@@ -56,7 +56,7 @@ def explain_sql_node(state: AgentState):
     try:
         llm = ChatGroq(
             model="llama-3.1-8b-instant",   # ✅ SAME FIX HERE
-            groq_api_key="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"
+            groq_api_key="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"
         )
 
         prompt = ChatPromptTemplate.from_messages([
